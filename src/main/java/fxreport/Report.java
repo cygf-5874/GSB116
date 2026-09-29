@@ -1,6 +1,13 @@
 package fxreport;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 /**
  * 报表渲染。
@@ -17,7 +24,33 @@ public final class Report {
      * @return 报表文本
      */
     public static String render(List<Entry> entries) {
-        throw new UnsupportedOperationException("Report.render 尚未实现");
+        Map<LocalDate, Map<String, BigDecimal>> groups = new TreeMap<>();
+        for (Entry entry : entries) {
+            groups.computeIfAbsent(entry.date(), date -> new TreeMap<String, BigDecimal>())
+                    .merge(entry.accountId(), entry.amount(), BigDecimal::add);
+        }
+
+        DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd", Locale.ROOT);
+
+        StringBuilder out = new StringBuilder();
+        out.append("date\taccount\tamount").append('\n');
+        out.append("-".repeat(40)).append('\n');
+
+        BigDecimal total = BigDecimal.ZERO.setScale(2);
+        for (Map.Entry<LocalDate, Map<String, BigDecimal>> byDate : groups.entrySet()) {
+            String date = dateFormatter.format(byDate.getKey());
+            for (Map.Entry<String, BigDecimal> byAccount : byDate.getValue().entrySet()) {
+                BigDecimal rounded = byAccount.getValue().setScale(2, RoundingMode.HALF_EVEN);
+                out.append(date).append('\t')
+                        .append(byAccount.getKey()).append('\t')
+                        .append(rounded.toPlainString()).append('\n');
+                total = total.add(rounded);
+            }
+        }
+
+        out.append("-".repeat(40)).append('\n');
+        out.append("TOTAL\t").append(total.toPlainString()).append('\n');
+        return out.toString();
     }
 
     private Report() {
